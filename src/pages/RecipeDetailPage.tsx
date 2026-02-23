@@ -421,14 +421,15 @@ function IngredientsList({
                 </motion.div>
               )}
             </AnimatePresence>
-            <span className={`flex-1 text-sm ${checkedIngredients.has(i) ? 'line-through text-warm-400' : 'text-warm-700'}`}>
-              {ing.name}
-            </span>
+            {/* In RTL Hebrew: quantity + unit appear first (inline-start side, after checkbox) */}
             {(ing.quantity || ing.unit) && (
-              <span className={`text-sm font-medium shrink-0 ${checkedIngredients.has(i) ? 'text-warm-300' : 'text-warm-500'}`}>
+              <span className={`text-sm font-semibold shrink-0 min-w-[3.5rem] ${checkedIngredients.has(i) ? 'text-warm-300' : 'text-brand-700'}`}>
                 {ing.quantity} {ing.unit}
               </span>
             )}
+            <span className={`flex-1 text-sm text-right ${checkedIngredients.has(i) ? 'line-through text-warm-400' : 'text-warm-700'}`}>
+              {ing.name}
+            </span>
           </button>
         ))}
       </div>
