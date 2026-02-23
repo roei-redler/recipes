@@ -30,6 +30,7 @@ export interface Recipe {
   prep_time: number | null;
   cook_time: number | null;
   image_url: string | null;
+  lock_password: string | null; // SHA-256 hex hash; null = unlocked
   created_at: string;
   updated_at: string;
   ingredients?: Ingredient[];
@@ -44,6 +45,9 @@ export interface RecipeFormData {
   prep_time: number | '';
   cook_time: number | '';
   image_url: string | null;
+  lock_password: string | null;      // current hash stored in DB (null = not locked)
+  newLockPassword: string;           // plain-text entered in form; '' = no change / remove
+  removeLock: boolean;               // explicit flag to remove existing lock
   ingredients: IngredientFormData[];
   steps: StepFormData[];
   tag_ids: string[];

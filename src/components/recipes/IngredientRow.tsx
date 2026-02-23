@@ -49,7 +49,6 @@ export default function IngredientRow({ ingredient, index, onChange, onRemove }:
 
       {/* Row 2 (RTL: right→left): indented to align with name | [Qty] [Unit flex-1] | gap for delete */}
       <div className={`flex items-center gap-2 ${ROW2_INDENT} ${ROW2_END}`}>
-        {/* Quantity — numbers are always LTR even in Hebrew */}
         <input
           type="number"
           value={ingredient.quantity}
@@ -57,8 +56,8 @@ export default function IngredientRow({ ingredient, index, onChange, onRemove }:
           placeholder="כמות"
           min={0}
           step="any"
-          dir="ltr"
-          className={`w-24 text-left ${inputCls}`}
+          dir="rtl"
+          className={`w-24 ${inputCls}`}
         />
 
         {/* Unit selector */}

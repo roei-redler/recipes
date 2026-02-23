@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Plus, Save, ArrowRight, Loader2, Tag as TagIcon, UtensilsCrossed, ListOrdered, Image as ImageIcon, ChefHat } from 'lucide-react';
+import {
+  Plus, Save, ArrowRight, Loader2, Tag as TagIcon,
+  UtensilsCrossed, ListOrdered, Image as ImageIcon,
+  ChefHat, Lock, LockOpen, Eye, EyeOff,
+} from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { saveRecipe, useRecipe } from '../hooks/useRecipes';
 import { useTags } from '../hooks/useTags';
@@ -26,6 +30,9 @@ const emptyFormData = (): RecipeFormData => ({
   prep_time: '',
   cook_time: '',
   image_url: null,
+  lock_password: null,
+  newLockPassword: '',
+  removeLock: false,
   ingredients: [],
   steps: [],
   tag_ids: [],
@@ -69,6 +76,8 @@ export default function AddEditRecipePage() {
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);
   const [creatingTag, setCreatingTag] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [wantsLock, setWantsLock] = useState(false);
 
   const [ingredientsParent] = useAutoAnimate<HTMLDivElement>();
   const [stepsParent] = useAutoAnimate<HTMLDivElement>();
@@ -84,6 +93,9 @@ export default function AddEditRecipePage() {
         prep_time: recipe.prep_time ?? '',
         cook_time: recipe.cook_time ?? '',
         image_url: recipe.image_url,
+        lock_password: recipe.lock_password,
+        newLockPassword: '',
+        removeLock: false,
         ingredients: (recipe.ingredients ?? []).map((ing) => ({
           id: ing.id,
           name: ing.name,
@@ -104,6 +116,8 @@ export default function AddEditRecipePage() {
       setCoverPreview(recipe.image_url);
     }
   }, [isEdit, recipe]);
+
+  const isCurrentlyLocked = Boolean(form.lock_password) && !form.removeLock;
 
   // Ingredients
   const addIngredient = () => {
@@ -185,11 +199,15 @@ export default function AddEditRecipePage() {
       titleRef.current?.focus();
       return;
     }
+    // Require a password if adding a new lock
+    if ((wantsLock || isCurrentlyLocked) && !form.lock_password && !form.newLockPassword && !form.removeLock) {
+      showToast('הגדר סיסמה לנעילת המתכון', 'info');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
       const result = await saveRecipe(form, coverFile, id);
-      // Sync lists and detail cache immediately — no manual refresh needed
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       if (id) queryClient.invalidateQueries({ queryKey: ['recipe', id] });
       showToast(isEdit ? 'המתכון עודכן בהצלחה' : 'המתכון נוסף בהצלחה', 'success');
@@ -213,6 +231,9 @@ export default function AddEditRecipePage() {
 
   const inputCls = 'w-full px-4 py-2.5 border border-warm-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 bg-warm-50 focus:bg-white transition-colors';
   const labelCls = 'block text-xs font-bold text-warm-500 uppercase tracking-wider mb-1';
+
+  // Lock section logic
+  const showLockInput = (wantsLock && !isCurrentlyLocked) || (isCurrentlyLocked && !form.removeLock);
 
   return (
     <PageTransition>
@@ -271,21 +292,21 @@ export default function AddEditRecipePage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className={labelCls}>הכנה (דק')</label>
-                <input type="number" value={form.prep_time} min={0}
+                <input type="number" value={form.prep_time} min={0} dir="rtl"
                   onChange={(e) => setForm((f) => ({ ...f, prep_time: e.target.value ? Number(e.target.value) : '' }))}
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className={labelCls}>בישול (דק')</label>
-                <input type="number" value={form.cook_time} min={0}
+                <input type="number" value={form.cook_time} min={0} dir="rtl"
                   onChange={(e) => setForm((f) => ({ ...f, cook_time: e.target.value ? Number(e.target.value) : '' }))}
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className={labelCls}>מנות</label>
-                <input type="number" value={form.servings} min={1}
+                <input type="number" value={form.servings} min={1} dir="rtl"
                   onChange={(e) => setForm((f) => ({ ...f, servings: e.target.value ? Number(e.target.value) : '' }))}
                   className={inputCls}
                 />
@@ -336,6 +357,91 @@ export default function AddEditRecipePage() {
               className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-semibold transition-colors">
               <Plus size={16} /> הוסף שלב
             </button>
+          </SectionCard>
+
+          {/* Lock */}
+          <SectionCard title="נעילת מתכון" icon={<Lock size={16} />} accentColor="border-r-warm-400">
+            {/* Status / toggle row */}
+            {isCurrentlyLocked ? (
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-2 text-sm text-warm-700">
+                  <Lock size={16} className="text-brand-500 shrink-0" />
+                  <span>המתכון נעול — נדרשת סיסמה לעריכה ומחיקה</span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => { setForm((f) => ({ ...f, newLockPassword: '', removeLock: false })); setShowNewPassword(false); }}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-warm-200 text-warm-600 hover:bg-warm-50 transition-colors"
+                  >
+                    שנה סיסמה
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, removeLock: true, newLockPassword: '' }))}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors flex items-center gap-1"
+                  >
+                    <LockOpen size={12} /> הסר נעילה
+                  </button>
+                </div>
+              </div>
+            ) : form.removeLock ? (
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm text-warm-500 flex items-center gap-2">
+                  <LockOpen size={15} className="text-warm-400" />
+                  הנעילה תוסר בשמירה
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, removeLock: false }))}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-warm-200 text-warm-600 hover:bg-warm-50 transition-colors"
+                >
+                  בטל
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setWantsLock((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${wantsLock ? 'bg-brand-500' : 'bg-warm-200'}`}
+                  role="switch"
+                  aria-checked={wantsLock}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${wantsLock ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+                <span className="text-sm text-warm-700">נעל מתכון עם סיסמה</span>
+              </div>
+            )}
+
+            {/* Password input — shown when setting/changing */}
+            {showLockInput && !form.removeLock && (
+              <div>
+                <label className={labelCls}>{isCurrentlyLocked ? 'סיסמה חדשה' : 'סיסמת נעילה'}</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={form.newLockPassword}
+                    onChange={(e) => setForm((f) => ({ ...f, newLockPassword: e.target.value }))}
+                    placeholder="הכנס סיסמה"
+                    autoComplete="new-password"
+                    className={`${inputCls} pe-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword((v) => !v)}
+                    className="absolute inset-y-0 start-0 px-3 flex items-center text-warm-400 hover:text-warm-700"
+                  >
+                    {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <p className="text-xs text-warm-400 mt-1.5">
+                  {isCurrentlyLocked
+                    ? 'השאר ריק כדי לשמור את הסיסמה הנוכחית'
+                    : 'ללא סיסמה המתכון יישאר פתוח לכולם'}
+                </p>
+              </div>
+            )}
           </SectionCard>
 
           {saveError && (

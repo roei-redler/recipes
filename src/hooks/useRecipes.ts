@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, uploadImage } from '../lib/supabase';
+import { hashPassword } from '../lib/utils';
 import type { Recipe, RecipeFilters, RecipeFormData } from '../lib/types';
 
 // ── Data fetchers ──────────────────────────────────────────────────────────
@@ -132,6 +133,14 @@ export async function saveRecipe(
     image_url = await uploadImage(coverImageFile, path);
   }
 
+  // Compute lock_password hash
+  let lock_password = formData.lock_password; // keep existing by default
+  if (formData.removeLock) {
+    lock_password = null;
+  } else if (formData.newLockPassword) {
+    lock_password = await hashPassword(formData.newLockPassword);
+  }
+
   const recipePayload = {
     title: formData.title,
     description: formData.description || null,
@@ -139,6 +148,7 @@ export async function saveRecipe(
     prep_time: formData.prep_time !== '' ? Number(formData.prep_time) : null,
     cook_time: formData.cook_time !== '' ? Number(formData.cook_time) : null,
     image_url,
+    lock_password,
   };
 
   let recipeId = existingId;

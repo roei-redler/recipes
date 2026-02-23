@@ -116,6 +116,12 @@ create policy "allow all on recipe-images"
 alter table recipe_steps add column if not exists duration integer; -- minutes
 
 -- ─────────────────────────────────────────────
+-- Recipe lock: SHA-256 hash of password (null = unlocked)
+-- ─────────────────────────────────────────────
+
+alter table recipes add column if not exists lock_password text; -- SHA-256 hex hash, null means unlocked
+
+-- ─────────────────────────────────────────────
 -- Sample tags
 -- ─────────────────────────────────────────────
 

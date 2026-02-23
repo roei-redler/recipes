@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,7 +16,11 @@ import {
   Share2,
   Copy,
   Home,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { verifyPassword } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -39,6 +43,37 @@ export default function RecipeDetailPage() {
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [cookingMode, setCookingMode] = useState(false);
+
+  // Password gate for locked recipes
+  const [gate, setGate] = useState<{ open: boolean; action: 'edit' | 'delete' | null }>({ open: false, action: null });
+  const [gatePassword, setGatePassword] = useState('');
+  const [gateError, setGateError] = useState('');
+  const [gateChecking, setGateChecking] = useState(false);
+  const [showGatePassword, setShowGatePassword] = useState(false);
+  const gateInputRef = useRef<HTMLInputElement>(null);
+
+  const openGate = (action: 'edit' | 'delete') => {
+    setGate({ open: true, action });
+    setGatePassword('');
+    setGateError('');
+    setShowGatePassword(false);
+    setTimeout(() => gateInputRef.current?.focus(), 80);
+  };
+
+  const handleGateSubmit = async () => {
+    if (!recipe?.lock_password) return;
+    setGateChecking(true);
+    const ok = await verifyPassword(gatePassword, recipe.lock_password);
+    setGateChecking(false);
+    if (!ok) {
+      setGateError('סיסמה שגויה');
+      return;
+    }
+    const action = gate.action;
+    setGate({ open: false, action: null });
+    if (action === 'edit') navigate(`/edit/${recipe.id}`);
+    if (action === 'delete') setDeleteModalOpen(true);
+  };
 
   const handleDelete = async () => {
     if (!id) return;
@@ -194,17 +229,26 @@ export default function RecipeDetailPage() {
             >
               <Share2 size={12} /> שיתוף
             </button>
-            <Link
-              to={`/edit/${recipe.id}`}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
-            >
-              <Edit2 size={12} /> עריכה
-            </Link>
+            {recipe.lock_password ? (
+              <button
+                onClick={() => openGate('edit')}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+              >
+                <Lock size={12} /> עריכה
+              </button>
+            ) : (
+              <Link
+                to={`/edit/${recipe.id}`}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+              >
+                <Edit2 size={12} /> עריכה
+              </Link>
+            )}
             <button
-              onClick={() => setDeleteModalOpen(true)}
+              onClick={() => recipe.lock_password ? openGate('delete') : setDeleteModalOpen(true)}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-500/70 backdrop-blur-sm text-white border border-red-300/30 hover:bg-red-600/80 transition-colors"
             >
-              <Trash2 size={12} /> מחיקה
+              {recipe.lock_password ? <Lock size={12} /> : <Trash2 size={12} />} מחיקה
             </button>
           </div>
 
@@ -347,6 +391,61 @@ export default function RecipeDetailPage() {
             />
           </div>
         </div>
+
+        {/* Password gate modal */}
+        <Modal
+          isOpen={gate.open}
+          onClose={() => setGate({ open: false, action: null })}
+          title={gate.action === 'delete' ? 'מחיקת מתכון — נדרשת סיסמה' : 'עריכת מתכון — נדרשת סיסמה'}
+          size="sm"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-warm-600 text-sm bg-warm-50 rounded-xl p-3">
+              <Lock size={15} className="text-brand-500 shrink-0" />
+              <span>מתכון זה נעול. הכנס את הסיסמה כדי להמשיך.</span>
+            </div>
+            <div className="relative">
+              <input
+                ref={gateInputRef}
+                type={showGatePassword ? 'text' : 'password'}
+                value={gatePassword}
+                onChange={(e) => { setGatePassword(e.target.value); setGateError(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleGateSubmit()}
+                placeholder="סיסמה"
+                autoComplete="current-password"
+                className={`w-full px-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 bg-warm-50 focus:bg-white transition-colors pe-10 ${
+                  gateError ? 'border-red-400 focus:border-red-400 focus:ring-red-200' : 'border-warm-200 focus:border-brand-400'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowGatePassword((v) => !v)}
+                className="absolute inset-y-0 start-0 px-3 flex items-center text-warm-400 hover:text-warm-700"
+              >
+                {showGatePassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+            {gateError && <p className="text-xs text-red-500 font-medium">{gateError}</p>}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setGate({ open: false, action: null })}
+                className="px-4 py-2 rounded-xl border border-warm-200 text-sm text-warm-600 hover:bg-warm-50 transition-colors"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleGateSubmit}
+                disabled={!gatePassword || gateChecking}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition-colors ${
+                  gate.action === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-brand-600 hover:bg-brand-700'
+                }`}
+              >
+                {gateChecking && <Loader2 size={14} className="animate-spin" />}
+                {gate.action === 'delete' ? 'מחק' : 'עבור לעריכה'}
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         {/* Delete modal */}
         <Modal isOpen={deleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="מחיקת מתכון" size="sm">
