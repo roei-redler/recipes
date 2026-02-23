@@ -15,6 +15,7 @@ import {
   Timer,
   Share2,
   Copy,
+  CopyPlus,
   Home,
   Lock,
   Eye,
@@ -24,7 +25,7 @@ import { verifyPassword } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRecipe, deleteRecipe } from '../hooks/useRecipes';
+import { useRecipe, deleteRecipe, duplicateRecipe } from '../hooks/useRecipes';
 import { useToast } from '../components/ui/Toast';
 import TagBadge from '../components/ui/TagBadge';
 import Modal from '../components/ui/Modal';
@@ -43,6 +44,32 @@ export default function RecipeDetailPage() {
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [cookingMode, setCookingMode] = useState(false);
+
+  // Duplicate modal
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
+
+  const openDuplicate = () => {
+    setDuplicateName(`עותק של ${recipe?.title ?? ''}`);
+    setDuplicateModalOpen(true);
+  };
+
+  const handleDuplicate = async () => {
+    if (!id || !duplicateName.trim()) return;
+    setDuplicating(true);
+    try {
+      const { id: newId } = await duplicateRecipe(id, duplicateName.trim());
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      showToast('המתכון שוכפל בהצלחה', 'success');
+      setDuplicateModalOpen(false);
+      navigate(`/recipe/${newId}`);
+    } catch {
+      showToast('שגיאה בשכפול המתכון', 'error');
+    } finally {
+      setDuplicating(false);
+    }
+  };
 
   // Password gate for locked recipes
   const [gate, setGate] = useState<{ open: boolean; action: 'edit' | 'delete' | null }>({ open: false, action: null });
@@ -220,7 +247,7 @@ export default function RecipeDetailPage() {
             </Link>
           </div>
 
-          {/* Edit / Delete / Share */}
+          {/* Edit / Delete / Share / Duplicate */}
           <div className="absolute top-4 left-4 flex gap-2">
             <button
               onClick={handleShare}
@@ -228,6 +255,13 @@ export default function RecipeDetailPage() {
               title="שתף מתכון"
             >
               <Share2 size={12} /> שיתוף
+            </button>
+            <button
+              onClick={openDuplicate}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+              title="שכפל מתכון"
+            >
+              <CopyPlus size={12} /> שכפול
             </button>
             {recipe.lock_password ? (
               <button
@@ -442,6 +476,39 @@ export default function RecipeDetailPage() {
               >
                 {gateChecking && <Loader2 size={14} className="animate-spin" />}
                 {gate.action === 'delete' ? 'מחק' : 'עבור לעריכה'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Duplicate modal */}
+        <Modal isOpen={duplicateModalOpen} onClose={() => setDuplicateModalOpen(false)} title="שכפול מתכון" size="sm">
+          <div className="space-y-4">
+            <p className="text-sm text-warm-600">בחר שם למתכון המשוכפל:</p>
+            <input
+              type="text"
+              value={duplicateName}
+              onChange={(e) => setDuplicateName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleDuplicate()}
+              placeholder="שם המתכון"
+              dir="rtl"
+              autoFocus
+              className="w-full px-4 py-2.5 border border-warm-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 bg-warm-50 focus:bg-white transition-colors"
+            />
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDuplicateModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-warm-200 text-sm text-warm-600 hover:bg-warm-50 transition-colors"
+              >
+                ביטול
+              </button>
+              <button
+                onClick={handleDuplicate}
+                disabled={!duplicateName.trim() || duplicating}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-semibold hover:bg-brand-700 disabled:opacity-50 transition-colors"
+              >
+                {duplicating && <Loader2 size={14} className="animate-spin" />}
+                שכפל
               </button>
             </div>
           </div>

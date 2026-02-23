@@ -222,3 +222,72 @@ export async function deleteRecipe(id: string): Promise<void> {
   const { error } = await supabase.from('recipes').delete().eq('id', id);
   if (error) throw error;
 }
+
+export async function duplicateRecipe(sourceId: string, newTitle: string): Promise<{ id: string }> {
+  // Fetch full source recipe
+  const { data, error: fetchErr } = await supabase
+    .from('recipes')
+    .select(`*, ingredients(*), steps:recipe_steps(*), tags:recipe_tags(tag_id)`)
+    .eq('id', sourceId)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  // Insert new recipe (no lock)
+  const { data: newRecipe, error: insertErr } = await supabase
+    .from('recipes')
+    .insert({
+      title: newTitle,
+      description: data.description,
+      servings: data.servings,
+      prep_time: data.prep_time,
+      cook_time: data.cook_time,
+      image_url: data.image_url,
+      lock_password: null,
+    })
+    .select('id')
+    .single();
+  if (insertErr) throw insertErr;
+
+  const newId = newRecipe.id;
+
+  // Copy ingredients
+  const ingredients = (data.ingredients ?? []).sort((a: any, b: any) => a.order_index - b.order_index);
+  if (ingredients.length > 0) {
+    const { error } = await supabase.from('ingredients').insert(
+      ingredients.map((ing: any, i: number) => ({
+        recipe_id: newId,
+        name: ing.name,
+        quantity: ing.quantity,
+        unit: ing.unit,
+        order_index: i,
+      }))
+    );
+    if (error) throw error;
+  }
+
+  // Copy steps
+  const steps = (data.steps ?? []).sort((a: any, b: any) => a.order_index - b.order_index);
+  if (steps.length > 0) {
+    const { error } = await supabase.from('recipe_steps').insert(
+      steps.map((step: any, i: number) => ({
+        recipe_id: newId,
+        description: step.description,
+        image_url: step.image_url,
+        order_index: i,
+        duration: step.duration,
+      }))
+    );
+    if (error) throw error;
+  }
+
+  // Copy tags
+  const tagIds = (data.tags ?? []).map((t: any) => t.tag_id);
+  if (tagIds.length > 0) {
+    const { error } = await supabase.from('recipe_tags').insert(
+      tagIds.map((tag_id: string) => ({ recipe_id: newId, tag_id }))
+    );
+    if (error) throw error;
+  }
+
+  return { id: newId };
+}
