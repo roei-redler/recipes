@@ -347,8 +347,8 @@ export default function RecipeDetailPage() {
 
           {/* Mobile tabs */}
           <div className="lg:hidden">
-            <Tabs defaultValue="ingredients">
-              <TabsList className="w-full mb-6">
+            <Tabs defaultValue="ingredients" dir="rtl">
+              <TabsList className="w-full mb-6" dir="rtl">
                 <TabsTrigger value="ingredients" className="flex-1">
                   מצרכים {recipe.ingredients?.length ? `(${recipe.ingredients.length})` : ''}
                 </TabsTrigger>
