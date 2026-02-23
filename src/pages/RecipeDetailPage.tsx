@@ -247,42 +247,47 @@ export default function RecipeDetailPage() {
             </Link>
           </div>
 
-          {/* Edit / Delete / Share / Duplicate */}
+          {/* Share / Duplicate / Edit / Delete */}
           <div className="absolute top-4 left-4 flex gap-2">
+            {/* Mobile: icon-only circles | sm+: pills with text */}
             <button
               onClick={handleShare}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
               title="שתף מתכון"
+              className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
             >
-              <Share2 size={12} /> שיתוף
+              <Share2 size={14} /><span className="hidden sm:inline">שיתוף</span>
             </button>
             <button
               onClick={openDuplicate}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
               title="שכפל מתכון"
+              className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
             >
-              <CopyPlus size={12} /> שכפול
+              <CopyPlus size={14} /><span className="hidden sm:inline">שכפול</span>
             </button>
             {recipe.lock_password ? (
               <button
                 onClick={() => openGate('edit')}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+                title="עריכה"
+                className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
               >
-                <Lock size={12} /> עריכה
+                <Lock size={14} /><span className="hidden sm:inline">עריכה</span>
               </button>
             ) : (
               <Link
                 to={`/edit/${recipe.id}`}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+                title="עריכה"
+                className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
               >
-                <Edit2 size={12} /> עריכה
+                <Edit2 size={14} /><span className="hidden sm:inline">עריכה</span>
               </Link>
             )}
             <button
               onClick={() => recipe.lock_password ? openGate('delete') : setDeleteModalOpen(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-500/70 backdrop-blur-sm text-white border border-red-300/30 hover:bg-red-600/80 transition-colors"
+              title="מחיקה"
+              className="flex items-center gap-1 p-2 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold bg-red-500/70 backdrop-blur-sm text-white border border-red-300/30 hover:bg-red-600/80 transition-colors"
             >
-              {recipe.lock_password ? <Lock size={12} /> : <Trash2 size={12} />} מחיקה
+              {recipe.lock_password ? <Lock size={14} /> : <Trash2 size={14} />}
+              <span className="hidden sm:inline">מחיקה</span>
             </button>
           </div>
 
