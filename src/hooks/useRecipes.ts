@@ -1,0 +1,214 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase, uploadImage } from '../lib/supabase';
+import type { Recipe, RecipeFilters, RecipeFormData } from '../lib/types';
+
+// ── Data fetchers ──────────────────────────────────────────────────────────
+
+async function fetchRecipesList(filters: RecipeFilters): Promise<Recipe[]> {
+  let query = supabase
+    .from('recipes')
+    .select(`
+      *,
+      ingredients(*),
+      steps:recipe_steps(*),
+      tags:recipe_tags(tag:tags(*))
+    `);
+
+  if (filters.search.trim()) {
+    query = query.or(
+      `title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`
+    );
+  }
+
+  if (filters.max_cook_time !== null) {
+    query = query.lte('cook_time', filters.max_cook_time);
+  }
+
+  if (filters.sort === 'alpha') {
+    query = query.order('title', { ascending: true });
+  } else if (filters.sort === 'oldest') {
+    query = query.order('created_at', { ascending: true });
+  } else {
+    query = query.order('created_at', { ascending: false });
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  let result = (data ?? []).map((r: any) => ({
+    ...r,
+    tags: (r.tags ?? []).map((rt: any) => rt.tag).filter(Boolean),
+  })) as Recipe[];
+
+  if (filters.tag_ids.length > 0) {
+    result = result.filter((r) =>
+      filters.tag_ids.every((tid) => r.tags?.some((t) => t.id === tid))
+    );
+  }
+
+  return result;
+}
+
+async function fetchRecipeById(id: string): Promise<Recipe> {
+  const { data, error } = await supabase
+    .from('recipes')
+    .select(`
+      *,
+      ingredients(*),
+      steps:recipe_steps(*),
+      tags:recipe_tags(tag:tags(*))
+    `)
+    .eq('id', id)
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return {
+    ...data,
+    tags: (data.tags ?? []).map((rt: any) => rt.tag).filter(Boolean),
+    ingredients: (data.ingredients ?? []).sort((a: any, b: any) => a.order_index - b.order_index),
+    steps: (data.steps ?? []).sort((a: any, b: any) => a.order_index - b.order_index),
+  } as Recipe;
+}
+
+// ── Hooks ──────────────────────────────────────────────────────────────────
+
+export function useRecipes(filters: RecipeFilters) {
+  const { data: recipes = [], isLoading: loading, error: err, refetch } = useQuery({
+    queryKey: ['recipes', filters],
+    queryFn: () => fetchRecipesList(filters),
+  });
+  return { recipes, loading, error: err ? (err as Error).message : null, refetch };
+}
+
+export function useRecipe(id: string | undefined) {
+  const { data: recipe = null, isLoading: loading, error: err, refetch } = useQuery({
+    queryKey: ['recipe', id],
+    queryFn: () => fetchRecipeById(id!),
+    enabled: !!id,
+  });
+  return { recipe, loading, error: err ? (err as Error).message : null, refetch };
+}
+
+export function useSaveRecipe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      formData,
+      coverImageFile,
+      existingId,
+    }: {
+      formData: RecipeFormData;
+      coverImageFile: File | null;
+      existingId?: string;
+    }) => saveRecipe(formData, coverImageFile, existingId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+}
+
+export function useDeleteRecipe() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteRecipe(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+}
+
+// ── Core async operations (also exported for direct use) ───────────────────
+
+export async function saveRecipe(
+  formData: RecipeFormData,
+  coverImageFile: File | null,
+  existingId?: string
+): Promise<{ id: string }> {
+  let image_url = formData.image_url;
+
+  if (coverImageFile) {
+    const path = `covers/${Date.now()}-${coverImageFile.name}`;
+    image_url = await uploadImage(coverImageFile, path);
+  }
+
+  const recipePayload = {
+    title: formData.title,
+    description: formData.description || null,
+    servings: formData.servings !== '' ? Number(formData.servings) : null,
+    prep_time: formData.prep_time !== '' ? Number(formData.prep_time) : null,
+    cook_time: formData.cook_time !== '' ? Number(formData.cook_time) : null,
+    image_url,
+  };
+
+  let recipeId = existingId;
+
+  if (existingId) {
+    const { error } = await supabase.from('recipes').update(recipePayload).eq('id', existingId);
+    if (error) throw error;
+  } else {
+    const { data, error } = await supabase
+      .from('recipes')
+      .insert(recipePayload)
+      .select('id')
+      .single();
+    if (error) throw error;
+    recipeId = data.id;
+  }
+
+  if (!recipeId) throw new Error('Recipe ID missing');
+
+  // Replace ingredients
+  await supabase.from('ingredients').delete().eq('recipe_id', recipeId);
+  if (formData.ingredients.length > 0) {
+    const { error } = await supabase.from('ingredients').insert(
+      formData.ingredients.map((ing, i) => ({
+        recipe_id: recipeId,
+        name: ing.name,
+        quantity: ing.quantity !== '' ? Number(ing.quantity) : null,
+        unit: ing.unit,
+        order_index: i,
+      }))
+    );
+    if (error) throw error;
+  }
+
+  // Replace steps
+  await supabase.from('recipe_steps').delete().eq('recipe_id', recipeId);
+  if (formData.steps.length > 0) {
+    const stepsWithImages = await Promise.all(
+      formData.steps.map(async (step, i) => {
+        let stepImageUrl = step.image_url;
+        if (step.imageFile) {
+          const path = `steps/${recipeId}/${Date.now()}-${step.imageFile.name}`;
+          stepImageUrl = await uploadImage(step.imageFile, path);
+        }
+        return {
+          recipe_id: recipeId,
+          description: step.description,
+          image_url: stepImageUrl,
+          order_index: i,
+          duration: step.duration !== '' ? Number(step.duration) : null,
+        };
+      })
+    );
+    const { error } = await supabase.from('recipe_steps').insert(stepsWithImages);
+    if (error) throw error;
+  }
+
+  // Replace tags
+  await supabase.from('recipe_tags').delete().eq('recipe_id', recipeId);
+  if (formData.tag_ids.length > 0) {
+    const { error } = await supabase.from('recipe_tags').insert(
+      formData.tag_ids.map((tag_id) => ({ recipe_id: recipeId, tag_id }))
+    );
+    if (error) throw error;
+  }
+
+  return { id: recipeId };
+}
+
+export async function deleteRecipe(id: string): Promise<void> {
+  const { error } = await supabase.from('recipes').delete().eq('id', id);
+  if (error) throw error;
+}
