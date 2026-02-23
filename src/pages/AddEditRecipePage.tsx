@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Plus, Save, ArrowRight, Loader2, Tag as TagIcon, UtensilsCrossed, ListOrdered, Image as ImageIcon } from 'lucide-react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Plus, Save, ArrowRight, Loader2, Tag as TagIcon, UtensilsCrossed, ListOrdered, Image as ImageIcon, ChefHat } from 'lucide-react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { saveRecipe, useRecipe } from '../hooks/useRecipes';
 import { useTags } from '../hooks/useTags';
@@ -54,6 +55,7 @@ export default function AddEditRecipePage() {
   const navigate = useNavigate();
   const isEdit = Boolean(id);
 
+  const queryClient = useQueryClient();
   const { recipe, loading: recipeLoading } = useRecipe(id);
   const { tags, createTag } = useTags();
   const { showToast } = useToast();
@@ -187,6 +189,9 @@ export default function AddEditRecipePage() {
     setSaveError(null);
     try {
       const result = await saveRecipe(form, coverFile, id);
+      // Sync lists and detail cache immediately — no manual refresh needed
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      if (id) queryClient.invalidateQueries({ queryKey: ['recipe', id] });
       showToast(isEdit ? 'המתכון עודכן בהצלחה' : 'המתכון נוסף בהצלחה', 'success');
       navigate(`/recipe/${result.id}`);
     } catch (err: unknown) {
@@ -217,14 +222,21 @@ export default function AddEditRecipePage() {
           <div className="max-w-2xl mx-auto flex items-center gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+              className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors shrink-0"
             >
               <ArrowRight size={20} />
             </button>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="text-xl font-bold">{isEdit ? 'עריכת מתכון' : 'מתכון חדש'}</h1>
               <p className="text-warm-400 text-xs mt-0.5">{isEdit ? 'עדכן את הפרטים' : 'מלא את הפרטים ושמור'}</p>
             </div>
+            <Link
+              to="/"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors shrink-0"
+            >
+              <ChefHat size={14} />
+              ספר המתכונים
+            </Link>
           </div>
         </div>
 

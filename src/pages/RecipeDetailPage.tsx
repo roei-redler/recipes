@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ArrowRight,
   Clock,
@@ -12,6 +13,9 @@ import {
   Circle,
   Play,
   Timer,
+  Share2,
+  Copy,
+  Home,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +30,7 @@ import PageTransition from '../components/ui/PageTransition';
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { recipe, loading, error } = useRecipe(id);
   const { showToast } = useToast();
 
@@ -40,11 +45,58 @@ export default function RecipeDetailPage() {
     setDeleting(true);
     try {
       await deleteRecipe(id);
+      // Sync home list immediately — no manual refresh needed
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
       showToast('המתכון נמחק', 'info');
       navigate('/');
     } catch {
       showToast('שגיאה במחיקת המתכון', 'error');
       setDeleting(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!recipe) return;
+
+    // Build a nice plain-text copy of the recipe
+    const lines: string[] = [`🍳 ${recipe.title}`];
+    if (recipe.description) lines.push('', recipe.description);
+    if (recipe.prep_time || recipe.cook_time) {
+      const parts = [];
+      if (recipe.prep_time) parts.push(`הכנה: ${recipe.prep_time} דק'`);
+      if (recipe.cook_time) parts.push(`בישול: ${recipe.cook_time} דק'`);
+      lines.push('', '⏱ ' + parts.join(' | '));
+    }
+    if (recipe.ingredients?.length) {
+      lines.push('', '📋 מצרכים:');
+      recipe.ingredients.forEach((ing) => {
+        const qty = [ing.quantity, ing.unit].filter(Boolean).join(' ');
+        lines.push(`• ${ing.name}${qty ? ` — ${qty}` : ''}`);
+      });
+    }
+    if (recipe.steps?.length) {
+      lines.push('', '👨‍🍳 שלבי הכנה:');
+      recipe.steps.forEach((step, i) => {
+        lines.push(`${i + 1}. ${step.description}`);
+      });
+    }
+    const text = lines.join('\n');
+    const url = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: recipe.title, text, url });
+        return;
+      } catch {
+        // User cancelled or not supported — fall through to clipboard
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('המתכון הועתק ללוח — אפשר להדביק בכל מקום', 'success');
+    } catch {
+      showToast('לא ניתן להעתיק', 'error');
     }
   };
 
@@ -115,16 +167,33 @@ export default function RecipeDetailPage() {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-          {/* Back button */}
-          <button
-            onClick={() => navigate(-1)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
-          >
-            <ArrowRight size={20} />
-          </button>
+          {/* Back + Home buttons */}
+          <div className="absolute top-4 right-4 flex items-center gap-2">
+            <button
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
+              title="חזור"
+            >
+              <ArrowRight size={20} />
+            </button>
+            <Link
+              to="/"
+              className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
+              title="דף הבית"
+            >
+              <Home size={18} />
+            </Link>
+          </div>
 
-          {/* Edit / Delete */}
+          {/* Edit / Delete / Share */}
           <div className="absolute top-4 left-4 flex gap-2">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
+              title="שתף מתכון"
+            >
+              <Share2 size={12} /> שיתוף
+            </button>
             <Link
               to={`/edit/${recipe.id}`}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-black/30 backdrop-blur-sm text-white border border-white/20 hover:bg-black/50 transition-colors"
@@ -174,9 +243,9 @@ export default function RecipeDetailPage() {
             </p>
           )}
 
-          {/* Play cooking mode button */}
+          {/* Action buttons row */}
           {stepsCount > 0 && (
-            <div className="flex gap-3 items-center mb-8">
+            <div className="flex flex-wrap gap-3 items-center mb-8">
               <button
                 onClick={() => setCookingMode(true)}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-l from-brand-600 to-orange-500 text-white font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
@@ -184,11 +253,31 @@ export default function RecipeDetailPage() {
                 <Play size={18} />
                 התחל להכין
               </button>
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-warm-200 text-warm-700 text-sm font-semibold shadow-sm hover:shadow-md hover:border-warm-300 hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <Copy size={15} />
+                העתק מתכון
+              </button>
               {hasTimers && (
                 <span className="flex items-center gap-1 text-xs text-warm-400">
                   <Timer size={13} /> שעוני עצר לכל שלב
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Share button when no steps */}
+          {stepsCount === 0 && (
+            <div className="mb-8">
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-warm-200 text-warm-700 text-sm font-semibold shadow-sm hover:shadow-md hover:border-warm-300 hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <Copy size={15} />
+                העתק מתכון
+              </button>
             </div>
           )}
 
