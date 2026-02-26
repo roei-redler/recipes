@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { GripVertical, Trash2, Image as ImageIcon, X, Timer } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -15,15 +15,22 @@ interface StepFormProps {
 export default function StepForm({ id, step, index, onChange, onRemove }: StepFormProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const [preview, setPreview] = useState<string | null>(step.image_url);
+  const previewRef = useRef<string | null>(preview);
+  useEffect(() => { previewRef.current = preview; }, [preview]);
+  useEffect(() => {
+    return () => { if (previewRef.current?.startsWith('blob:')) URL.revokeObjectURL(previewRef.current); };
+  }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (previewRef.current?.startsWith('blob:')) URL.revokeObjectURL(previewRef.current);
     onChange(index, 'imageFile', file);
     setPreview(URL.createObjectURL(file));
   };
 
   const removeImage = () => {
+    if (previewRef.current?.startsWith('blob:')) URL.revokeObjectURL(previewRef.current);
     onChange(index, 'imageFile', null);
     onChange(index, 'image_url', null);
     setPreview(null);

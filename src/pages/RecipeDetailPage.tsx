@@ -378,6 +378,32 @@ export default function RecipeDetailPage() {
             </div>
           )}
 
+          {/* All done celebration */}
+          <AnimatePresence>
+            {stepsCount > 0 && checkedSteps.size === stepsCount && (
+              <motion.div
+                key="celebration"
+                initial={{ opacity: 0, scale: 0.92, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 12 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                className="mb-8 rounded-2xl bg-gradient-to-l from-fresh-500 to-fresh-400 text-white px-6 py-5 flex items-center gap-4 shadow-lg"
+              >
+                <motion.span
+                  animate={{ rotate: [0, -15, 15, -10, 10, 0] }}
+                  transition={{ delay: 0.2, duration: 0.8 }}
+                  className="text-4xl select-none"
+                >
+                  🎉
+                </motion.span>
+                <div>
+                  <p className="font-bold text-lg leading-tight">כל הכבוד! סיימת להכין את המתכון</p>
+                  <p className="text-fresh-100 text-sm mt-0.5">תהנה מהאוכל!</p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* ── Desktop two-column / Mobile tabs ── */}
 
           {/* Mobile tabs */}

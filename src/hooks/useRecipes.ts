@@ -139,7 +139,7 @@ export async function saveRecipe(
   if (formData.removeLock) {
     lock_password = null;
   } else if (formData.newLockPassword) {
-    lock_password = await hashPassword(formData.newLockPassword);
+    lock_password = await hashPassword(formData.newLockPassword.trim());
   }
 
   const recipePayload = {

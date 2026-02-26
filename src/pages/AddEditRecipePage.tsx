@@ -19,6 +19,7 @@ import ImageUpload from '../components/ui/ImageUpload';
 import TagBadge from '../components/ui/TagBadge';
 import Modal from '../components/ui/Modal';
 import PageTransition from '../components/ui/PageTransition';
+import NotFoundPage from './NotFoundPage';
 
 const PRESET_COLORS = [
   '#6366f1', '#ec4899', '#10b981', '#f59e0b', '#ef4444',
@@ -65,7 +66,7 @@ export default function AddEditRecipePage() {
   const isEdit = Boolean(id);
 
   const queryClient = useQueryClient();
-  const { recipe, loading: recipeLoading } = useRecipe(id);
+  const { recipe, loading: recipeLoading, error: recipeError } = useRecipe(id);
   const { tags, createTag } = useTags();
   const { showToast } = useToast();
 
@@ -229,14 +230,24 @@ export default function AddEditRecipePage() {
     }
   };
 
-  // Cover image
+  // Cover image — revoke old blob URLs to avoid memory leaks
+  const coverPreviewRef = useRef<string | null>(null);
+  useEffect(() => { coverPreviewRef.current = coverPreview; }, [coverPreview]);
+  useEffect(() => {
+    return () => {
+      if (coverPreviewRef.current?.startsWith('blob:')) URL.revokeObjectURL(coverPreviewRef.current);
+    };
+  }, []);
+
   const handleCoverSelect = (file: File) => {
+    if (coverPreviewRef.current?.startsWith('blob:')) URL.revokeObjectURL(coverPreviewRef.current);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
     setForm((f) => ({ ...f, image_url: null }));
   };
 
   const handleCoverRemove = () => {
+    if (coverPreviewRef.current?.startsWith('blob:')) URL.revokeObjectURL(coverPreviewRef.current);
     setCoverFile(null);
     setCoverPreview(null);
     setForm((f) => ({ ...f, image_url: null }));
@@ -254,10 +265,21 @@ export default function AddEditRecipePage() {
       showToast('הגדר סיסמה לנעילת המתכון', 'info');
       return;
     }
+    // Reject whitespace-only password
+    if (form.newLockPassword && !form.newLockPassword.trim()) {
+      showToast('הסיסמה לא יכולה להכיל רק רווחים', 'error');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
-      const result = await saveRecipe(form, coverFile, id);
+      const cleanedForm = {
+        ...form,
+        title: form.title.trim(),
+        ingredients: form.ingredients.filter((ing) => ing.name.trim()),
+        steps: form.steps.filter((step) => step.description.trim()),
+      };
+      const result = await saveRecipe(cleanedForm, coverFile, id);
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       if (id) queryClient.invalidateQueries({ queryKey: ['recipe', id] });
       showToast(isEdit ? 'המתכון עודכן בהצלחה' : 'המתכון נוסף בהצלחה', 'success');
@@ -278,6 +300,10 @@ export default function AddEditRecipePage() {
         <Loader2 className="animate-spin text-brand-500" size={32} />
       </div>
     );
+  }
+
+  if (isEdit && !recipeLoading && (recipeError || !recipe)) {
+    return <NotFoundPage />;
   }
 
   const inputCls = 'w-full px-4 py-2.5 border border-warm-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 bg-warm-50 focus:bg-white transition-colors';
@@ -344,21 +370,21 @@ export default function AddEditRecipePage() {
               <div>
                 <label className={labelCls}>הכנה (דק')</label>
                 <input type="number" value={form.prep_time} min={0} dir="rtl"
-                  onChange={(e) => setForm((f) => ({ ...f, prep_time: e.target.value ? Number(e.target.value) : '' }))}
+                  onChange={(e) => setForm((f) => ({ ...f, prep_time: e.target.value ? Math.max(0, Number(e.target.value)) : '' }))}
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className={labelCls}>בישול (דק')</label>
                 <input type="number" value={form.cook_time} min={0} dir="rtl"
-                  onChange={(e) => setForm((f) => ({ ...f, cook_time: e.target.value ? Number(e.target.value) : '' }))}
+                  onChange={(e) => setForm((f) => ({ ...f, cook_time: e.target.value ? Math.max(0, Number(e.target.value)) : '' }))}
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className={labelCls}>מנות</label>
                 <input type="number" value={form.servings} min={1} dir="rtl"
-                  onChange={(e) => setForm((f) => ({ ...f, servings: e.target.value ? Number(e.target.value) : '' }))}
+                  onChange={(e) => setForm((f) => ({ ...f, servings: e.target.value ? Math.max(1, Number(e.target.value)) : '' }))}
                   className={inputCls}
                 />
               </div>
