@@ -8,8 +8,8 @@ interface ImageUploadProps {
   label?: string;
 }
 
-// Accept all image formats including HEIC/HEIF from iOS
-const ACCEPT = 'image/*,.heic,.heif';
+// Accept all common image formats explicitly (image/* + iOS HEIC/HEIF)
+const ACCEPT = 'image/*,.heic,.heif,.heics,.avif,.webp,.jpg,.jpeg,.png,.gif,.bmp,.tiff,.svg,.ico';
 
 export default function ImageUpload({ currentUrl, onFileSelect, onRemove, label = 'תמונה' }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);

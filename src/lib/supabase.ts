@@ -12,7 +12,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export async function uploadImage(file: File, path: string): Promise<string> {
   const { error } = await supabase.storage
     .from('recipe-images')
-    .upload(path, file, { upsert: true });
+    .upload(path, file, {
+      upsert: true,
+      contentType: file.type || 'image/jpeg', // explicit MIME so WebP/AVIF/HEIC are stored correctly
+    });
 
   if (error) throw error;
 
