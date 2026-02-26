@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { GripVertical, Trash2, Image as ImageIcon, X, Timer } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { StepFormData } from '../../lib/types';
 
 interface StepFormProps {
+  id: number;
   step: StepFormData;
   index: number;
   onChange: (index: number, field: keyof StepFormData, value: string | number | File | null) => void;
   onRemove: (index: number) => void;
 }
 
-export default function StepForm({ step, index, onChange, onRemove }: StepFormProps) {
+export default function StepForm({ id, step, index, onChange, onRemove }: StepFormProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const [preview, setPreview] = useState<string | null>(step.image_url);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,8 +30,19 @@ export default function StepForm({ step, index, onChange, onRemove }: StepFormPr
   };
 
   return (
-    <div className="flex gap-3 group bg-white border border-warm-100 rounded-2xl p-4 shadow-sm hover:border-warm-200 transition-colors">
-      <GripVertical size={16} className="text-warm-300 cursor-grab mt-1 shrink-0" />
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={`flex gap-3 group bg-white border rounded-2xl p-4 shadow-sm transition-colors ${
+        isDragging ? 'border-brand-300 shadow-lg opacity-70 z-10 relative' : 'border-warm-100 hover:border-warm-200'
+      }`}
+    >
+      <GripVertical
+        size={16}
+        className="text-warm-300 hover:text-warm-500 cursor-grab active:cursor-grabbing mt-1 shrink-0 touch-none"
+        {...attributes}
+        {...listeners}
+      />
 
       {/* Step number badge */}
       <div className="flex items-start justify-center w-8 h-8 mt-0.5 rounded-xl bg-brand-100 text-brand-700 text-sm font-bold shrink-0">

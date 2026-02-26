@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams, Link, useBlocker } from 'react-router-dom';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Save, ArrowRight, Loader2, Tag as TagIcon,
@@ -189,6 +191,22 @@ export default function AddEditRecipePage() {
 
   const removeStep = (index: number) => {
     setForm((f) => ({ ...f, steps: f.steps.filter((_, i) => i !== index) }));
+  };
+
+  // Drag-to-reorder steps
+  const stepSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } })
+  );
+
+  const reorderSteps = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setForm((f) => ({
+      ...f,
+      steps: arrayMove(f.steps, Number(active.id), Number(over.id))
+        .map((s, i) => ({ ...s, order_index: i })),
+    }));
   };
 
   // Tags
@@ -381,11 +399,15 @@ export default function AddEditRecipePage() {
 
           {/* Steps */}
           <SectionCard title="שלבי הכנה" icon={<ListOrdered size={16} />} accentColor="border-r-fresh-500">
-            <div ref={stepsParent} className="space-y-3">
-              {form.steps.map((step, i) => (
-                <StepForm key={`step-${i}`} step={step} index={i} onChange={updateStep} onRemove={removeStep} />
-              ))}
-            </div>
+            <DndContext sensors={stepSensors} collisionDetection={closestCenter} onDragEnd={reorderSteps}>
+              <SortableContext items={form.steps.map((_, i) => i)} strategy={verticalListSortingStrategy}>
+                <div ref={stepsParent} className="space-y-3">
+                  {form.steps.map((step, i) => (
+                    <StepForm key={`step-${i}`} id={i} step={step} index={i} onChange={updateStep} onRemove={removeStep} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
             <button type="button" onClick={addStep}
               className="flex items-center gap-2 text-sm text-brand-600 hover:text-brand-800 font-semibold transition-colors">
               <Plus size={16} /> הוסף שלב
