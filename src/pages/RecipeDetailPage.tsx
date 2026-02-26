@@ -31,6 +31,7 @@ import TagBadge from '../components/ui/TagBadge';
 import Modal from '../components/ui/Modal';
 import CookingMode from '../components/recipes/CookingMode';
 import PageTransition from '../components/ui/PageTransition';
+import NotFoundPage from './NotFoundPage';
 
 export default function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -194,12 +195,7 @@ export default function RecipeDetailPage() {
   }
 
   if (error || !recipe) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
-        <p className="text-warm-500 mb-4">{error ?? 'המתכון לא נמצא'}</p>
-        <Link to="/" className="text-brand-600 hover:underline">חזור לדף הבית</Link>
-      </div>
-    );
+    return <NotFoundPage />;
   }
 
   const totalTime = (recipe.prep_time ?? 0) + (recipe.cook_time ?? 0);
