@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useBlocker } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus, Save, ArrowRight, Loader2, Tag as TagIcon,
@@ -79,13 +79,45 @@ export default function AddEditRecipePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [wantsLock, setWantsLock] = useState(false);
 
+  // Unsaved changes guard
+  const [isDirty, setIsDirty] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const skipNextDirtyCheck = useRef(true); // skip initial mount + recipe load
+
   const [ingredientsParent] = useAutoAnimate<HTMLDivElement>();
   const [stepsParent] = useAutoAnimate<HTMLDivElement>();
   const titleRef = useRef<HTMLInputElement>(null);
 
+  // Block in-app navigation when there are unsaved changes
+  const blocker = useBlocker(isDirty && !saving);
+
+  // Show custom modal when navigation is blocked
+  useEffect(() => {
+    if (blocker.state === 'blocked') setShowLeaveModal(true);
+  }, [blocker.state]);
+
+  // Warn on browser close / refresh / tab close
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Track dirty state — skip initial mount and recipe loads
+  useEffect(() => {
+    if (skipNextDirtyCheck.current) {
+      skipNextDirtyCheck.current = false;
+      return;
+    }
+    setIsDirty(true);
+  }, [form, coverFile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Populate form on edit
   useEffect(() => {
     if (isEdit && recipe) {
+      skipNextDirtyCheck.current = true; // don't mark dirty when loading recipe
+      setIsDirty(false);
       setForm({
         title: recipe.title,
         description: recipe.description ?? '',
@@ -211,6 +243,7 @@ export default function AddEditRecipePage() {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       if (id) queryClient.invalidateQueries({ queryKey: ['recipe', id] });
       showToast(isEdit ? 'המתכון עודכן בהצלחה' : 'המתכון נוסף בהצלחה', 'success');
+      setIsDirty(false); // clear before navigating so blocker doesn't fire
       navigate(`/recipe/${result.id}`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'שגיאה בשמירה';
@@ -462,6 +495,32 @@ export default function AddEditRecipePage() {
             </button>
           </div>
         </form>
+
+        {/* Leave without saving modal */}
+        <Modal
+          isOpen={showLeaveModal}
+          onClose={() => { blocker.reset?.(); setShowLeaveModal(false); }}
+          title="שינויים לא נשמרו"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-warm-600">יש שינויים שלא נשמרו. האם לצאת בלי לשמור את המתכון?</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => { blocker.reset?.(); setShowLeaveModal(false); }}
+                className="px-4 py-2 rounded-xl border border-warm-200 text-sm text-warm-600 hover:bg-warm-50 transition-colors"
+              >
+                הישאר
+              </button>
+              <button
+                onClick={() => { setIsDirty(false); blocker.proceed?.(); setShowLeaveModal(false); }}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+              >
+                צא בלי לשמור
+              </button>
+            </div>
+          </div>
+        </Modal>
 
         {/* New tag modal */}
         <Modal isOpen={tagModalOpen} onClose={() => setTagModalOpen(false)} title="תגית חדשה" size="sm">
