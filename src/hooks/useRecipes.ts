@@ -129,7 +129,8 @@ export async function saveRecipe(
   let image_url = formData.image_url;
 
   if (coverImageFile) {
-    const path = `covers/${Date.now()}-${coverImageFile.name}`;
+    const ext = coverImageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const path = `covers/${Date.now()}.${ext}`;
     image_url = await uploadImage(coverImageFile, path);
   }
 
@@ -190,7 +191,8 @@ export async function saveRecipe(
       formData.steps.map(async (step, i) => {
         let stepImageUrl = step.image_url;
         if (step.imageFile) {
-          const path = `steps/${recipeId}/${Date.now()}-${step.imageFile.name}`;
+          const ext = step.imageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const path = `steps/${recipeId}/${Date.now()}-${i}.${ext}`;
           stepImageUrl = await uploadImage(step.imageFile, path);
         }
         return {
