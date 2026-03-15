@@ -1,12 +1,14 @@
 import type { Config } from '@netlify/functions';
 
-export default async () => {
-  const supabaseUrl = Netlify.env.get('SUPABASE_URL');
-  const supabaseAnonKey = Netlify.env.get('SUPABASE_ANON_KEY');
+export default async (req: Request) => {
+  const { next_run } = await req.json();
+
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
-    return new Response('Missing environment variables', { status: 500 });
+    return;
   }
 
   const response = await fetch(
@@ -21,17 +23,14 @@ export default async () => {
 
   if (!response.ok) {
     console.error('Supabase request failed:', response.statusText);
-    return new Response('Failed to fetch recipes', { status: 500 });
+    return;
   }
 
   const recipes = await response.json();
   const recipeName = recipes[0]?.title ?? 'No recipes found';
 
   console.log('First recipe:', recipeName);
-
-  return new Response(JSON.stringify({ firstRecipe: recipeName }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  console.log('Next invocation at:', next_run);
 };
 
 export const config: Config = {
