@@ -11,8 +11,8 @@ jobs:
     steps:
       - name: Fetch first recipe name
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           response=$(curl -s \
             "${SUPABASE_URL}/rest/v1/recipes?select=title&order=created_at.asc&limit=1" \
