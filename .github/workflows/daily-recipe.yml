@@ -1,0 +1,23 @@
+name: Daily First Recipe
+
+on:
+  schedule:
+    - cron: '0 8 * * *' # Every day at 8:00 UTC
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  get-first-recipe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch first recipe name
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          response=$(curl -s \
+            "${SUPABASE_URL}/rest/v1/recipes?select=title&order=created_at.asc&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+
+          recipe_name=$(echo "$response" | jq -r '.[0].title // "No recipes found"')
+          echo "First recipe: $recipe_name"
