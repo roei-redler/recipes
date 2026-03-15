@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Plus, ChefHat, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRecipes } from '../hooks/useRecipes';
+import { useRecipes, useRecipeAvailability } from '../hooks/useRecipes';
 import { useTags } from '../hooks/useTags';
 import type { Recipe, RecipeFilters } from '../lib/types';
 import RecipeCard from '../components/recipes/RecipeCard';
@@ -73,6 +73,7 @@ export default function HomePage() {
 
   const { recipes, loading, error } = useRecipes(filters);
   const { tags } = useTags();
+  const availability = useRecipeAvailability();
 
   const activeFilterCount =
     filters.tag_ids.length +
@@ -205,14 +206,14 @@ export default function HomePage() {
                     transition={{ duration: 0.22 }}
                     className="mb-6 lg:hidden"
                   >
-                    <FilterPanel filters={filters} onChange={setFilters} tags={tags} />
+                    <FilterPanel filters={filters} onChange={setFilters} tags={tags} availability={availability} />
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* Desktop: always visible, sticky */}
               <div className="hidden lg:block lg:sticky lg:top-6">
-                <FilterPanel filters={filters} onChange={setFilters} tags={tags} />
+                <FilterPanel filters={filters} onChange={setFilters} tags={tags} availability={availability} />
               </div>
             </aside>
 

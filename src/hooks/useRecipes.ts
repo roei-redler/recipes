@@ -72,7 +72,31 @@ async function fetchRecipeById(id: string): Promise<Recipe> {
   } as Recipe;
 }
 
+async function fetchRecipeAvailability() {
+  const [{ data: tagData }, { data: cookData }] = await Promise.all([
+    supabase.from('recipe_tags').select('tag_id'),
+    supabase.from('recipes').select('cook_time'),
+  ]);
+
+  const usedTagIds = [...new Set((tagData ?? []).map((r: any) => r.tag_id as string))];
+  const cookTimes = (cookData ?? [])
+    .map((r: any) => r.cook_time as number | null)
+    .filter((t): t is number => t != null);
+
+  return { usedTagIds, cookTimes };
+}
+
+export type RecipeAvailability = Awaited<ReturnType<typeof fetchRecipeAvailability>>;
+
 // ── Hooks ──────────────────────────────────────────────────────────────────
+
+export function useRecipeAvailability() {
+  const { data = { usedTagIds: [], cookTimes: [] } } = useQuery({
+    queryKey: ['recipe-availability'],
+    queryFn: fetchRecipeAvailability,
+  });
+  return data;
+}
 
 export function useRecipes(filters: RecipeFilters) {
   const { data: recipes = [], isLoading: loading, error: err, refetch } = useQuery({
@@ -105,6 +129,7 @@ export function useSaveRecipe() {
     }) => saveRecipe(formData, coverImageFile, existingId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe-availability'] });
     },
   });
 }
@@ -115,6 +140,7 @@ export function useDeleteRecipe() {
     mutationFn: (id: string) => deleteRecipe(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['recipe-availability'] });
     },
   });
 }

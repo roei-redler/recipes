@@ -6,6 +6,7 @@ interface TagBadgeProps {
   onRemove?: () => void;
   onClick?: () => void;
   selected?: boolean;
+  disabled?: boolean;
   size?: 'sm' | 'md';
   overlay?: boolean; // true when rendered over a dark image
 }
@@ -16,6 +17,7 @@ export default function TagBadge({
   onRemove,
   onClick,
   selected,
+  disabled = false,
   size = 'md',
   overlay = false,
 }: TagBadgeProps) {
@@ -33,13 +35,15 @@ export default function TagBadge({
 
   return (
     <span
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full font-medium cursor-pointer select-none transition-all ${padding} ${
-        selected ? 'ring-2 ring-offset-1 scale-105' : 'opacity-80 hover:opacity-100'
+      onClick={disabled ? undefined : onClick}
+      className={`inline-flex items-center gap-1 rounded-full font-medium select-none transition-all ${padding} ${
+        disabled
+          ? 'cursor-default opacity-40'
+          : `cursor-pointer ${selected ? 'ring-2 ring-offset-1 scale-105' : 'opacity-80 hover:opacity-100'}`
       }`}
       style={{
         backgroundColor: color + '22',
-        color,
+        color: disabled ? undefined : color,
         borderColor: color,
         outlineColor: selected ? color : undefined,
       }}
